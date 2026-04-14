@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Set
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse
-
-import yaml
+import time
+import random
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from selenium import webdriver
@@ -18,6 +19,8 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from webdriver_manager.chrome import ChromeDriverManager
+from src.data.connectors.collection_targets import build_indeed_searches, load_collection_targets
 
 load_dotenv()
 
@@ -25,26 +28,44 @@ load_dotenv()
 @dataclass(frozen=True)
 class IndeedSettings:
     indeed_base_url: str = os.getenv("INDEED_BASE_URL", "https://fr.indeed.com")
-    user_agent: str = os.getenv("USER_AGENT", "Mozilla/5.0")
     request_timeout: int = int(os.getenv("REQUEST_TIMEOUT", "30"))
     selenium_headless: bool = os.getenv("SELENIUM_HEADLESS", "false").lower() == "true"
 
 
 class IndeedSeleniumScraper:
-    def __init__(self) -> None:
-        self.settings = IndeedSettings()
+    def __init__(self, headless: bool | None = None) -> None:
+        if headless is None:
+            self.settings = IndeedSettings()
+        else:
+            self.settings = IndeedSettings(selenium_headless=headless)
+
+        self._driver_dir = Path(tempfile.mkdtemp(prefix="job_market_indeed_"))
+        self.user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+        ]
 
     def _build_driver(self) -> webdriver.Chrome:
         options = ChromeOptions()
-        options.add_argument(f"--user-agent={self.settings.user_agent}")
+        options.add_argument(f"--user-agent={random.choice(self.user_agents)}")
         options.add_argument("--window-size=1400,1200")
         options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
+
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-plugins")
+        options.add_argument("--remote-debugging-port=9222")
+        options.add_argument(f"--user-data-dir={self._driver_dir / 'chrome-profile'}")
 
         if self.settings.selenium_headless:
             options.add_argument("--headless=new")
 
-        return webdriver.Chrome(service=ChromeService(), options=options)
+        return webdriver.Chrome(
+            service=ChromeService(ChromeDriverManager().install()),
+            options=options
+        )
 
     def build_search_url(self, query: str, location: str = "", start: int = 0) -> str:
         params = {
@@ -56,9 +77,10 @@ class IndeedSeleniumScraper:
 
     def fetch_search_page_html(self, query: str, location: str = "", start: int = 0) -> str:
         url = self.build_search_url(query=query, location=location, start=start)
-        driver = self._build_driver()
-
+        driver = None
+        
         try:
+            driver = self._build_driver()
             driver.get(url)
             wait = WebDriverWait(driver, self.settings.request_timeout)
 
@@ -72,8 +94,17 @@ class IndeedSeleniumScraper:
                 pass
 
             return driver.page_source
+
+        except Exception as e:
+            print(f"Erreur lors du fetch: {e}")
+            raise
+
         finally:
-            driver.quit()
+            if driver:
+                try:
+                    driver.quit()
+                except Exception as e:
+                    print(f"Erreur lors de quit(): {e}")
 
     def parse_search_page(self, html: str) -> List[dict]:
         soup = BeautifulSoup(html, "lxml")
@@ -114,8 +145,12 @@ class IndeedSeleniumScraper:
             company = None
             location = None
             salary = None
+            contract_type = None
+            working_time = None
             published_at = None
             snippet = None
+            card_attributes: List[str] = []
+            benefits: List[str] = []
 
             if card is not None:
                 company = self._get_first_text(
@@ -141,11 +176,27 @@ class IndeedSeleniumScraper:
                 salary = self._get_first_text(
                     card,
                     [
+                        "li.salary-snippet-container",
                         "div[data-testid='attribute_snippet_testid']",
                         ".salary-snippet-container",
                         "span.salary-snippet",
                     ],
                 )
+
+                card_attributes = self._get_all_texts(
+                    card,
+                    [
+                        "li[data-testid='attribute_snippet_testid']",
+                        "li.salary-snippet-container",
+                        "ul.metadataContainer li",
+                    ],
+                )
+
+                classified_attributes = self._classify_card_attributes(card_attributes)
+                salary = salary or classified_attributes["salary"]
+                contract_type = classified_attributes["contract_type"]
+                working_time = classified_attributes["working_time"]
+                benefits = classified_attributes["benefits"]
 
                 published_at = self._get_first_text(
                     card,
@@ -158,6 +209,7 @@ class IndeedSeleniumScraper:
                 snippet = self._get_first_text(
                     card,
                     [
+                        "div[data-testid='belowJobSnippet']",
                         "div[data-testid='text-snippet']",
                         ".job-snippet",
                     ],
@@ -170,45 +222,39 @@ class IndeedSeleniumScraper:
                     "title": title,
                     "company": company,
                     "location": location,
-                    "contract_type": None,
+                    "contract_type": contract_type,
+                    "working_time": working_time,
                     "salary": salary,
                     "published_at": published_at,
                     "job_url": job_url,
                     "description": snippet,
+                    "benefits": benefits,
                     "raw_payload": {
                         "href": href,
+                        "card_attributes": card_attributes,
+                        "benefits": benefits,
+                        "company": company,
+                        "location": location,
+                        "salary": salary,
+                        "contract_type": contract_type,
+                        "working_time": working_time,
+                        "published_at": published_at,
+                        "description_snippet": snippet,
                     },
                 }
             )
 
         return self._deduplicate_jobs(jobs)
 
-    def load_searches_from_yaml(self, yaml_path: str) -> List[dict]:
-        path = Path(yaml_path)
-        content = yaml.safe_load(path.read_text(encoding="utf-8"))
-
-        searches: List[dict] = []
-
-        for sector_block in content.get("sectors", []):
-            sector = sector_block.get("sector")
-            rome_family = sector_block.get("rome_family")
-
-            for search in sector_block.get("searches", []):
-                searches.append(
-                    {
-                        "sector": sector,
-                        "rome_family": rome_family,
-                        "query": search.get("query", ""),
-                        "location": search.get("location", ""),
-                    }
-                )
-
-        return searches
+    def load_searches_from_targets_file(self, yaml_path: str) -> List[dict]:
+        return build_indeed_searches(load_collection_targets(yaml_path))
 
     def collect_jobs_from_queries(self, searches: List[dict]) -> List[dict]:
         all_jobs: List[dict] = []
 
         for search in searches:
+            delay = random.uniform(2, 5)
+            time.sleep(delay)
             html = self.fetch_search_page_html(
                 query=search["query"],
                 location=search.get("location", ""),
@@ -217,27 +263,26 @@ class IndeedSeleniumScraper:
             jobs = self.parse_search_page(html)
 
             for job in jobs:
-                job["sector"] = search.get("sector")
+                job["sector"] = search.get("sector_slug")
+                job["sector_label"] = search.get("sector_label")
                 job["rome_family"] = search.get("rome_family")
+                job["rome_codes"] = search.get("rome_codes", [])
+                job["regions"] = search.get("regions", [])
+                job["departements"] = search.get("departements", [])
                 job["search_query"] = search["query"]
                 job["search_location"] = search.get("location", "")
 
             all_jobs.extend(jobs)
             print(
                 f"{search['query']} / {search.get('location', '')} "
-                f"/ {search.get('sector', '')} -> {len(jobs)} offres"
+                f"/ {search.get('sector_slug', '')} -> {len(jobs)} offres"
             )
 
         return self._deduplicate_jobs(all_jobs)
 
-    def collect_jobs_from_yaml(self, yaml_path: str) -> List[dict]:
-        searches = self.load_searches_from_yaml(yaml_path)
+    def collect_jobs_from_targets_file(self, yaml_path: str) -> List[dict]:
+        searches = self.load_searches_from_targets_file(yaml_path)
         return self.collect_jobs_from_queries(searches)
-
-    def _absolute_url(self, href: Optional[str]) -> Optional[str]:
-        if not href:
-            return None
-        return urljoin(self.settings.indeed_base_url, href)
 
     def _find_job_card(self, element):
         selectors = [
@@ -297,6 +342,142 @@ class IndeedSeleniumScraper:
                 if text:
                     return text
         return None
+
+    def _get_all_texts(self, element, selectors: List[str]) -> List[str]:
+        values: List[str] = []
+        seen: Set[str] = set()
+
+        for selector in selectors:
+            for found in element.select(selector):
+                text = self._clean_text(found.get_text(" ", strip=True))
+                if text and text not in seen:
+                    seen.add(text)
+                    values.append(text)
+
+        return values
+
+    def _classify_card_attributes(self, attributes: List[str]) -> dict:
+        salary: Optional[str] = None
+        contract_type: Optional[str] = None
+        working_time_values: List[str] = []
+        benefits: List[str] = []
+
+        for attribute in attributes:
+            normalized = attribute.lower()
+
+            if salary is None and self._looks_like_salary(normalized):
+                salary = attribute
+                continue
+
+            if contract_type is None and self._looks_like_contract_type(normalized):
+                contract_type = self._normalize_contract_type(attribute)
+                continue
+
+            if self._looks_like_working_time(normalized):
+                normalized_working_time = self._normalize_working_time(attribute)
+                if normalized_working_time:
+                    working_time_values.append(normalized_working_time)
+                continue
+
+            if self._looks_like_non_benefit_metadata(normalized):
+                continue
+
+            benefits.append(attribute)
+
+        working_time = " | ".join(dict.fromkeys(working_time_values)) or None
+
+        return {
+            "salary": salary,
+            "contract_type": contract_type,
+            "working_time": working_time,
+            "benefits": list(dict.fromkeys(benefits)),
+        }
+
+    @staticmethod
+    def _looks_like_salary(value: str) -> bool:
+        return "€" in value or "eur" in value or "par an" in value or "par jour" in value or "par mois" in value or "par heure" in value
+
+    @staticmethod
+    def _looks_like_contract_type(value: str) -> bool:
+        contract_tokens = [
+            "cdi",
+            "cdd",
+            "stage",
+            "alternance",
+            "contrat d'apprentissage",
+            "contrat de professionnalisation",
+            "freelance",
+            "intérim",
+            "interim",
+            "indépendant",
+            "independant",
+            "franchise",
+            "profession libérale",
+            "profession liberale",
+        ]
+        return any(token in value for token in contract_tokens)
+
+    @staticmethod
+    def _looks_like_working_time(value: str) -> bool:
+        return (
+            "temps plein" in value
+            or "temps partiel" in value
+            or "35h" in value
+            or "39h" in value
+            or "24h" in value
+            or "30h" in value
+            or "par semaine" in value
+            or "h/semaine" in value
+        )
+
+    @staticmethod
+    def _looks_like_non_benefit_metadata(value: str) -> bool:
+        noise_tokens = [
+            "candidature simplifiée",
+            "candidature simplifiee",
+            "annonce",
+            "urgent",
+            "nouveau",
+            "répond souvent",
+            "repond souvent",
+            "employeur actif",
+        ]
+        return any(token in value for token in noise_tokens)
+
+    @staticmethod
+    def _normalize_contract_type(value: str) -> str:
+        normalized = value.lower()
+
+        if "contrat d'apprentissage" in normalized:
+            return "Contrat d'apprentissage"
+        if "contrat de professionnalisation" in normalized:
+            return "Contrat de professionnalisation"
+        if "alternance" in normalized:
+            return "Alternance"
+        if "stage" in normalized:
+            return "Stage"
+        if "cdi" in normalized:
+            return "CDI"
+        if "cdd" in normalized:
+            return "CDD"
+        if "interim" in normalized or "intérim" in normalized:
+            return "Intérim"
+        if "freelance" in normalized:
+            return "Freelance"
+
+        return value
+
+    @staticmethod
+    def _normalize_working_time(value: str) -> Optional[str]:
+        normalized = value.lower()
+
+        if "temps plein" in normalized:
+            return "Temps plein"
+        if "temps partiel" in normalized:
+            return "Temps partiel"
+
+        cleaned = " ".join(value.split())
+        return cleaned or None
 
     @staticmethod
     def _deduplicate_jobs(jobs: List[dict]) -> List[dict]:

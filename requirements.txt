@@ -5,3 +5,7 @@ pandas>=2.2,<3
 requests>=2.32,<3
 lxml>=5.2,<6
 PyYAML>=6.0,<7
+psycopg[binary]>=3.2,<4
+dbt-core
+dbt-postgres
+webdriver-manager

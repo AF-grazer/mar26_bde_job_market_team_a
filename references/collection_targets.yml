@@ -1,0 +1,219 @@
+targets:
+  - sector_slug: data_it
+    sector_label: Data et informatique
+    rome_family: informatique_et_systemes_d_information
+    rome_codes:
+      - M1805
+      - M1802
+    regions:
+      - "11"
+      - "84"
+      - "76"
+    departements:
+      - "75"
+      - "69"
+      - "31"
+    indeed_searches:
+      - query: "data engineer"
+        location: "Paris"
+      - query: "data analyst"
+        location: "Lyon"
+      - query: "developpeur python"
+        location: "Toulouse"
+
+  - sector_slug: agriculture
+    sector_label: Agriculture
+    rome_family: agriculture_et_travaux_nature
+    rome_codes:
+      - A1405
+      - A1414
+    regions:
+      - "75"
+      - "27"
+      - "52"
+    departements:
+      - "33"
+      - "21"
+      - "44"
+    indeed_searches:
+      - query: "ouvrier agricole"
+        location: "Bordeaux"
+      - query: "agent viticole"
+        location: "Dijon"
+      - query: "maraicher"
+        location: "Nantes"
+
+  - sector_slug: restauration
+    sector_label: Hotellerie et restauration
+    rome_family: hotellerie_restauration
+    rome_codes:
+      - G1603
+      - G1803
+    regions:
+      - "11"
+      - "32"
+      - "93"
+    departements:
+      - "75"
+      - "59"
+      - "13"
+    indeed_searches:
+      - query: "employe polyvalent restauration"
+        location: "Paris"
+      - query: "equipier polyvalent"
+        location: "Lille"
+      - query: "serveur"
+        location: "Marseille"
+
+  - sector_slug: commerce_distribution
+    sector_label: Commerce et distribution
+    rome_family: commerce_vente_distribution
+    rome_codes:
+      - D1505
+      - D1507
+    regions:
+      - "84"
+      - "76"
+      - "93"
+    departements:
+      - "69"
+      - "31"
+      - "06"
+    indeed_searches:
+      - query: "employe libre service"
+        location: "Lyon"
+      - query: "hote de caisse"
+        location: "Toulouse"
+      - query: "vendeur"
+        location: "Nice"
+
+  - sector_slug: logistique_transport
+    sector_label: Logistique et transport
+    rome_family: transport_logistique
+    rome_codes:
+      - N1103
+      - N4105
+    regions:
+      - "32"
+      - "44"
+      - "11"
+    departements:
+      - "59"
+      - "67"
+      - "75"
+    indeed_searches:
+      - query: "preparateur de commandes"
+        location: "Lille"
+      - query: "cariste"
+        location: "Strasbourg"
+      - query: "chauffeur livreur"
+        location: "Paris"
+
+  - sector_slug: industrie_production
+    sector_label: Industrie et production
+    rome_family: industrie_et_production
+    rome_codes:
+      - H2906
+      - H3303
+    regions:
+      - "84"
+      - "44"
+    departements:
+      - "42"
+      - "51"
+      - "68"
+    indeed_searches:
+      - query: "agent de production"
+        location: "Saint-Etienne"
+      - query: "conducteur de ligne"
+        location: "Reims"
+      - query: "operateur de fabrication"
+        location: "Mulhouse"
+
+  - sector_slug: btp_maintenance
+    sector_label: BTP et maintenance
+    rome_family: batiment_travaux_publics_maintenance
+    rome_codes:
+      - F1703
+      - F1602
+      - I1304
+    regions:
+      - "93"
+      - "52"
+      - "53"
+    departements:
+      - "13"
+      - "44"
+      - "35"
+    indeed_searches:
+      - query: "macon"
+        location: "Marseille"
+      - query: "electricien"
+        location: "Nantes"
+      - query: "agent de maintenance"
+        location: "Rennes"
+
+  - sector_slug: nettoyage_services
+    sector_label: Nettoyage et services
+    rome_family: proprete_et_services
+    rome_codes:
+      - K2204
+    regions:
+      - "11"
+      - "84"
+      - "76"
+    departements:
+      - "75"
+      - "69"
+      - "34"
+    indeed_searches:
+      - query: "agent d'entretien"
+        location: "Paris"
+      - query: "agent de proprete"
+        location: "Lyon"
+      - query: "agent de nettoyage"
+        location: "Montpellier"
+
+  - sector_slug: sante_aide_personne
+    sector_label: Sante et aide a la personne
+    rome_family: sante_et_aide_a_la_personne
+    rome_codes:
+      - J1501
+      - K1306
+    regions:
+      - "76"
+      - "75"
+      - "93"
+    departements:
+      - "31"
+      - "33"
+      - "06"
+    indeed_searches:
+      - query: "aide soignant"
+        location: "Toulouse"
+      - query: "auxiliaire de vie"
+        location: "Bordeaux"
+      - query: "aide a domicile"
+        location: "Nice"
+
+  - sector_slug: administratif
+    sector_label: Administratif
+    rome_family: gestion_administration
+    rome_codes:
+      - M1607
+      - M1501
+    regions:
+      - "11"
+      - "32"
+      - "84"
+    departements:
+      - "75"
+      - "59"
+      - "69"
+    indeed_searches:
+      - query: "assistant administratif"
+        location: "Paris"
+      - query: "secretaire"
+        location: "Lille"
+      - query: "gestionnaire paie"
+        location: "Lyon"

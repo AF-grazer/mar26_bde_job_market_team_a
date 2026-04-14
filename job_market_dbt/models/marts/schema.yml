@@ -1,0 +1,123 @@
+version: 2
+
+models:
+  - name: fct_job_offers
+    description: "Offres canoniques finales, une ligne par offre dedupliquee."
+    columns:
+      - name: job_id
+        tests: [not_null, unique]
+      - name: company_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_company')
+                field: company_id
+      - name: location_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_location')
+                field: location_id
+      - name: contract_type_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_contract')
+                field: contract_type_id
+      - name: job_type_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_job_type')
+                field: job_type_id
+
+  - name: bridge_job_source
+    description: "Trace toutes les offres source rattachees a l'offre canonique."
+    columns:
+      - name: job_source_id
+        tests: [not_null, unique]
+      - name: job_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('fct_job_offers')
+                field: job_id
+
+  - name: dim_company
+    columns:
+      - name: company_id
+        tests: [not_null, unique]
+
+  - name: dim_location
+    columns:
+      - name: location_id
+        tests: [not_null, unique]
+
+  - name: dim_contract
+    columns:
+      - name: contract_type_id
+        tests: [not_null, unique]
+
+  - name: dim_job_type
+    columns:
+      - name: job_type_id
+        tests: [not_null, unique]
+
+  - name: dim_industry
+    columns:
+      - name: industry_id
+        tests: [not_null, unique]
+
+  - name: dim_salary
+    columns:
+      - name: salary_id
+        tests: [not_null, unique]
+
+  - name: dim_education
+    columns:
+      - name: education_id
+        tests: [not_null, unique]
+
+  - name: dim_skill
+    columns:
+      - name: skill_id
+        tests: [not_null, unique]
+
+  - name: dim_advantage
+    columns:
+      - name: advantage_id
+        tests: [not_null, unique]
+
+  - name: bridge_job_skill
+    columns:
+      - name: job_skill_id
+        tests: [not_null, unique]
+      - name: job_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('fct_job_offers')
+                field: job_id
+      - name: skill_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_skill')
+                field: skill_id
+
+  - name: bridge_job_advantage
+    columns:
+      - name: job_advantage_id
+        tests: [not_null, unique]
+      - name: job_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('fct_job_offers')
+                field: job_id
+      - name: advantage_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_advantage')
+                field: advantage_id

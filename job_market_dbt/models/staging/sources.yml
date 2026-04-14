@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: landing
+    description: "Tables raw chargees depuis les JSON locaux dans PostgreSQL."
+    schema: landing
+    tables:
+      - name: raw_france_travail_offers
+        description: "Offres France Travail conservees telles qu'ingerees, sans deduplication."
+      - name: raw_indeed_offers
+        description: "Offres Indeed conservees telles qu'ingerees, sans deduplication."

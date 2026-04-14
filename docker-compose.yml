@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: job_market_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-job_market}
+      POSTGRES_USER: ${POSTGRES_USER:-job_market}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-job_market}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-job_market} -d ${POSTGRES_DB:-job_market}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./models/create_postgredb.sql:/docker-entrypoint-initdb.d/01_create_landing.sql:ro
+
+  pgadmin:
+    image: dpage/pgadmin4:9
+    container_name: job_market_pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@jobmarket.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+volumes:
+  postgres_data:
+  pgadmin_data:
